@@ -199,11 +199,31 @@ class AgentJobWorkflow:
         agents_in_rack = [agent for agent in tor3_agents if agent in machines_with_tag]
         tested_agents = []
         for agent in agents_in_rack:
-            _, state, streak_count, streak_type = await workflow.execute_activity(
-                get_agent_data_activity,
-                args=[agent],
-                schedule_to_close_timeout=timedelta(seconds=60),
-            )
+            # Try to get agent data with retries
+            agent_data = None
+            for attempt in range(3):  # 3 attempts total (initial + 2 retries)
+                agent_data = await workflow.execute_activity(
+                    get_agent_data_activity,
+                    args=[agent],
+                    schedule_to_close_timeout=timedelta(seconds=60),
+                )
+                if agent_data is not None:
+                    break
+                if attempt < 2:  # Don't wait after the last attempt
+                    workflow.logger.info(
+                        f"[Workflow] Agent {agent} not found, retrying in 1 hour (attempt {attempt + 1}/3)"
+                    )
+                    await workflow.sleep(3600)  # Wait 1 hour
+                else:
+                    workflow.logger.info(
+                        f"[Workflow] Agent {agent} not found after 3 attempts, skipping"
+                    )
+
+            if agent_data is None:
+                results[agent] = "agent_not_found"
+                continue
+
+            _, state, streak_count, streak_type = agent_data
             workflow.logger.info(f"[Workflow] Agent: {agent}, State: {state}")
             if state != "waiting":
                 workflow.logger.info(
@@ -241,7 +261,7 @@ class AgentJobWorkflow:
                 f"[Workflow] Waiting 5 minutes before monitoring job {job_id} for agent: {agent}"
             )
             await workflow.sleep(300)  # Wait 5 minutes
-            
+
             workflow.logger.info(
                 f"[Workflow] Starting to monitor job {job_id} for agent: {agent}"
             )
