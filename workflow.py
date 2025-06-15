@@ -238,7 +238,12 @@ class AgentJobWorkflow:
                 results[agent] = "submit_failed"
                 continue
             workflow.logger.info(
-                f"[Workflow] Monitoring job {job_id} for agent: {agent}"
+                f"[Workflow] Waiting 5 minutes before monitoring job {job_id} for agent: {agent}"
+            )
+            await workflow.sleep(300)  # Wait 5 minutes
+            
+            workflow.logger.info(
+                f"[Workflow] Starting to monitor job {job_id} for agent: {agent}"
             )
             try:
                 job_result = await workflow.execute_activity(
