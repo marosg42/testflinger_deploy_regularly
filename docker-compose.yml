@@ -1,0 +1,71 @@
+# Copyright 2024-2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+services:
+  temporal-postgresql:
+    container_name: temporal-postgresql
+    image: postgres:14
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+
+  temporal:
+    container_name: temporal
+    depends_on:
+      - temporal-postgresql
+    image: temporalio/auto-setup:1.24.2
+    ports:
+      - 7233:7233
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgresql
+      TEMPORAL_CSRF_COOKIE_INSECURE: true
+    healthcheck:
+      test: [ "CMD-SHELL", "tctl --address temporal:7233 workflow list" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  temporal-admin-tools:
+    container_name: temporal-admin-tools
+    depends_on:
+      - temporal
+    image: temporalio/admin-tools:1.24.2-tctl-1.18.1-cli-0.13.0
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CLI_ADDRESS: temporal:7233
+      TEMPORAL_CSRF_COOKIE_INSECURE: true
+    stdin_open: true
+    tty: true
+
+  temporal-ui:
+    container_name: temporal-ui
+    depends_on:
+      - temporal
+    image: temporalio/ui:2.26.2
+    ports:
+      - 8000:8080
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+      TEMPORAL_CSRF_COOKIE_INSECURE: true
+
+  worker:
+    # container_name: temporal-worker
+    depends_on:
+      - temporal
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    # environment:
+    #   - MAAS_API_KEY=${MAAS_API_KEY}
+    #   - MAAS_URL=${MAAS_URL}
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["python", "worker.py"]
+    deploy:
+      replicas: 2

@@ -1,0 +1,14 @@
+FROM python:3.12
+
+RUN pip3 install uv 
+
+WORKDIR /app
+
+COPY pyproject.toml .
+COPY uv.lock .
+ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
+RUN uv sync --locked --no-dev
+
+COPY . .
+
+CMD ["uv", "run", "worker.py"]
