@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from temporalio.worker import Worker
-from main import submit_job_activity, monitor_job_activity, get_machines_activity, get_tor3_agents_activity, get_agent_data_activity, AgentJobWorkflow
+from workflow import submit_job_activity, monitor_job_activity, get_machines_activity, get_tor3_agents_activity, get_agent_data_activity, AgentJobWorkflow
 
 if __name__ == "__main__":
     logging.basicConfig(
