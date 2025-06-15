@@ -98,20 +98,40 @@ async def get_agent_data_activity(agent_name):
     import requests
     from urllib.parse import urljoin
 
-    base_url = "https://testflinger.canonical.com/"
-    url = urljoin(base_url, "v1/agents/data")
-    response = requests.get(url)
-    response.raise_for_status()
-    agents = response.json()
-    for agent in agents:
-        if agent.get("name") == agent_name:
-            return (
-                agent_name,
-                agent.get("state"),
-                agent.get("provision_streak_count"),
-                agent.get("provision_streak_type"),
-            )
-    return None
+    try:
+        base_url = "https://testflinger.canonical.com/"
+        url = urljoin(base_url, "v1/agents/data")
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        agents = response.json()
+
+        # Ensure agents is iterable
+        if not isinstance(agents, (list, tuple)):
+            logger.error(f"[Activity] Unexpected API response format: {type(agents)}")
+            return None
+
+        for agent in agents:
+            if isinstance(agent, dict) and agent.get("name") == agent_name:
+                return (
+                    agent_name,
+                    agent.get("state"),
+                    agent.get("provision_streak_count"),
+                    agent.get("provision_streak_type"),
+                )
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.error(
+            f"[Activity] Network error getting agent data for {agent_name}: {e}"
+        )
+        return None
+    except requests.exceptions.JSONDecodeError as e:
+        logger.error(f"[Activity] JSON decode error for agent {agent_name}: {e}")
+        return None
+    except Exception as e:
+        logger.error(
+            f"[Activity] Unexpected error getting agent data for {agent_name}: {e}"
+        )
+        return None
 
 
 @activity.defn
