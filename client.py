@@ -19,7 +19,10 @@ async def main(rack: str):
         id=f"testflinger-agents-{rack}",
         task_queue="testflinger-task-queue",
     )
-    logger.info(f"Started workflow with workflow_id: {handle.id}, run_id: {handle.first_execution_run_id}")
+    logger.info(
+        f"Started workflow with workflow_id: {handle.id}, run_id: {handle.first_execution_run_id}"
+    )
+
 
 if __name__ == "__main__":
     asyncio.run(main(sys.argv[1]))
