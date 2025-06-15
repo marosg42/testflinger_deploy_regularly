@@ -60,9 +60,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    # environment:
-    #   - MAAS_API_KEY=${MAAS_API_KEY}
-    #   - MAAS_URL=${MAAS_URL}
+    environment:
+      - MAAS_API_KEY=${MAAS_API_KEY}
+      - MAAS_URL=${MAAS_URL}
     volumes:
       - .:/app
     working_dir: /app
