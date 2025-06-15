@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Temporal-based Python application that monitors and tests Testflinger agents in specific hardware racks. The architecture consists of:
 
-- **main.py**: Core Temporal workflow (`AgentJobWorkflow`) and activities for interacting with MAAS API and Testflinger API
+- **workflow.py**: Core Temporal workflow (`AgentJobWorkflow`) and activities for interacting with MAAS API and Testflinger API
 - **worker.py**: Temporal worker that executes workflows and activities 
 - **client.py**: CLI client to start workflows for specific racks
 - **docker-compose.yml**: Full stack including Temporal server, PostgreSQL, UI, and worker containers
