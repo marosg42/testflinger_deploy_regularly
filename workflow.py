@@ -219,25 +219,25 @@ class AgentJobWorkflow:
         agents_in_rack = [agent for agent in tor3_agents if agent in machines_with_tag]
         tested_agents = []
         for agent in agents_in_rack:
-            # Try to get agent data with retries
-            agent_data = None
-            for attempt in range(3):  # 3 attempts total (initial + 2 retries)
+            # Try to get agent data with Temporal retry policy
+            try:
                 agent_data = await workflow.execute_activity(
                     get_agent_data_activity,
                     args=[agent],
-                    schedule_to_close_timeout=timedelta(seconds=60),
+                    schedule_to_close_timeout=timedelta(seconds=90),
+                    retry_policy=RetryPolicy(
+                        maximum_attempts=3,
+                        initial_interval=timedelta(hours=1),
+                        backoff_coefficient=1.0,
+                    ),
                 )
-                if agent_data is not None:
-                    break
-                if attempt < 2:  # Don't wait after the last attempt
-                    workflow.logger.info(
-                        f"[Workflow] Agent {agent} not found, retrying in 1 hour (attempt {attempt + 1}/3)"
-                    )
-                    await workflow.sleep(3600)  # Wait 1 hour
-                else:
-                    workflow.logger.info(
-                        f"[Workflow] Agent {agent} not found after 3 attempts, skipping"
-                    )
+            except Exception as e:
+                workflow.logger.info(
+                    f"[Workflow] Agent {agent} not found after 3 attempts, waiting 1 hour before skipping: {e}"
+                )
+                await workflow.sleep(3600)  # Wait 1 hour before skipping
+                results[agent] = "agent_not_found"
+                continue
 
             if agent_data is None:
                 results[agent] = "agent_not_found"
