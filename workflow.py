@@ -67,7 +67,7 @@ async def get_machines_activity(rack):
         params={"tags": rack},
     )
     prepped = req.prepare()
-    resp = s.send(prepped)
+    resp = s.send(prepped, timeout=30)
     if resp.status_code != 200:
         logger.error("No machines found, exiting")
         return []
@@ -82,7 +82,7 @@ async def get_tor3_agents_activity():
 
     base_url = "https://testflinger.canonical.com/"
     url = urljoin(base_url, "v1/agents/data")
-    response = requests.get(url)
+    response = requests.get(url, timeout=30)
     response.raise_for_status()
     agents = response.json()
     filtered = [
@@ -147,7 +147,7 @@ async def submit_job_activity(agent_name: str) -> Optional[str]:
         "provision_data": {"distro": "noble"},
         "reserve_data": {"timeout": 120},
     }
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
     if response.status_code == 200:
         job_id = response.json().get("job_id")
         logger.info(
@@ -170,7 +170,7 @@ async def monitor_job_activity(job_id: str, agent_name: str) -> str:
 
     base_url = "https://testflinger.canonical.com/"
     url = urljoin(base_url, f"v1/result/{job_id}")
-    response = requests.get(url)
+    response = requests.get(url, timeout=30)
     if response.status_code == 200:
         data = response.json()
         state = data.get("job_state")
@@ -209,12 +209,12 @@ class AgentJobWorkflow:
         machines_with_tag = await workflow.execute_activity(
             get_machines_activity,
             args=[rack],
-            schedule_to_close_timeout=timedelta(seconds=60),
+            schedule_to_close_timeout=timedelta(seconds=90),
         )
         tor3_agents = await workflow.execute_activity(
             get_tor3_agents_activity,
             args=[],
-            schedule_to_close_timeout=timedelta(seconds=60),
+            schedule_to_close_timeout=timedelta(seconds=90),
         )
         agents_in_rack = [agent for agent in tor3_agents if agent in machines_with_tag]
         tested_agents = []
@@ -264,7 +264,7 @@ class AgentJobWorkflow:
                 job_id = await workflow.execute_activity(
                     submit_job_activity,
                     args=[agent],
-                    schedule_to_close_timeout=timedelta(seconds=60),
+                    schedule_to_close_timeout=timedelta(seconds=90),
                     retry_policy=RetryPolicy(
                         maximum_attempts=3,
                         initial_interval=timedelta(seconds=30),
