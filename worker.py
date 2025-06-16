@@ -7,7 +7,6 @@ from workflow import (
     get_machines_activity,
     get_tor3_agents_activity,
     get_agent_data_activity,
-    validate_config_activity,
     AgentJobWorkflow,
 )
 
@@ -34,7 +33,6 @@ if __name__ == "__main__":
                 get_machines_activity,
                 get_tor3_agents_activity,
                 get_agent_data_activity,
-                validate_config_activity,
             ],
         )
         print("Worker started. Waiting for workflows...")

@@ -20,33 +20,6 @@ def get_auth(api_key):
     return auth
 
 
-# All non-deterministic code must be in activities
-@activity.defn
-async def validate_config_activity():
-    import os
-
-    # Check required environment variables
-    required_vars = ["MAAS_URL", "MAAS_API_KEY"]
-    missing = [var for var in required_vars if not os.environ.get(var)]
-    if missing:
-        raise Exception(f"Missing required environment variables: {missing}")
-
-    # Validate MAAS_API_KEY format
-    api_key = os.environ.get("MAAS_API_KEY")
-    if len(api_key.split(":")) != 3:
-        raise Exception(
-            "MAAS_API_KEY must be in format 'consumer_key:token_key:token_secret'"
-        )
-
-    # Validate MAAS_URL format
-    maas_url = os.environ.get("MAAS_URL")
-    if not maas_url.startswith(("http://", "https://")):
-        raise Exception("MAAS_URL must start with http:// or https://")
-
-    logger.info("Configuration validation passed")
-    return True
-
-
 @activity.defn
 async def get_machines_activity(rack):
     import os
@@ -196,13 +169,6 @@ class AgentJobWorkflow:
     @workflow.run
     async def run(self, rack):
         workflow.logger.info(f"[Workflow] Starting AgentJobWorkflow with rack: {rack}")
-
-        # Validate configuration at startup
-        await workflow.execute_activity(
-            validate_config_activity,
-            args=[],
-            schedule_to_close_timeout=timedelta(seconds=30),
-        )
 
         results = {}
         # Get machines and agents via activities
