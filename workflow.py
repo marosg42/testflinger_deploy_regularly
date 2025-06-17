@@ -40,12 +40,28 @@ async def get_machines_activity(rack):
         params={"tags": rack},
     )
     prepped = req.prepare()
-    resp = s.send(prepped, timeout=30)
-    if resp.status_code != 200:
-        logger.error("No machines found, exiting")
+
+    try:
+        resp = s.send(prepped, timeout=30)
+        if resp.status_code != 200:
+            logger.error(
+                f"MAAS API returned status {resp.status_code}, returning empty list"
+            )
+            return []
+        machines = resp.json()
+        return [machine["hostname"] for machine in machines]
+    except requests.exceptions.ConnectTimeout as e:
+        logger.error(f"MAAS API connection timeout for rack {rack}: {e}")
         return []
-    machines = resp.json()
-    return [machine["hostname"] for machine in machines]
+    except requests.exceptions.RequestException as e:
+        logger.error(f"MAAS API request failed for rack {rack}: {e}")
+        return []
+    except requests.exceptions.JSONDecodeError as e:
+        logger.error(f"MAAS API returned invalid JSON for rack {rack}: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting machines for rack {rack}: {e}")
+        return []
 
 
 @activity.defn
