@@ -69,17 +69,30 @@ async def get_tor3_agents_activity():
     import requests
     from urllib.parse import urljoin
 
-    base_url = "https://testflinger.canonical.com/"
-    url = urljoin(base_url, "v1/agents/data")
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    agents = response.json()
-    filtered = [
-        agent["name"]
-        for agent in agents
-        if "location" in agent and "TOR3" in agent["location"]
-    ]
-    return filtered
+    try:
+        base_url = "https://testflinger.canonical.com/"
+        url = urljoin(base_url, "v1/agents/data")
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        agents = response.json()
+        filtered = [
+            agent["name"]
+            for agent in agents
+            if "location" in agent and "TOR3" in agent["location"]
+        ]
+        return filtered
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"Testflinger API HTTP error: {e}")
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Testflinger API request failed: {e}")
+        return []
+    except requests.exceptions.JSONDecodeError as e:
+        logger.error(f"Testflinger API returned invalid JSON: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error getting TOR3 agents: {e}")
+        return []
 
 
 @activity.defn

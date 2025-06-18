@@ -18,6 +18,15 @@ This is a Temporal-based Python application that monitors and tests Testflinger 
 3. **MAAS Integration**: Fetches machines by rack tag using OAuth1 authentication
 4. **Testflinger Integration**: Monitors agents, submits jobs, and tracks completion status
 
+### Error Handling & Timeouts
+
+All HTTP requests have 30-second timeouts to prevent hanging. Activities have 90-second Temporal timeouts. Key resilience features:
+
+- **MAAS API failures**: Return empty list, workflow continues and retries in 6 hours
+- **Testflinger API failures**: Individual agent failures don't kill workflow; HTTP errors (403 Forbidden, etc.) return empty lists
+- **Network timeouts**: Caught and logged, workflow continues with other agents
+- **Agent data retrieval**: Uses Temporal RetryPolicy (3 attempts, 1-hour intervals)
+
 ## Development Commands
 
 ### Formatting
