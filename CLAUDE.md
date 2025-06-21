@@ -27,6 +27,10 @@ All HTTP requests have 30-second timeouts to prevent hanging. Activities have 90
 - **Network timeouts**: Caught and logged, workflow continues with other agents
 - **Agent data retrieval**: Uses Temporal RetryPolicy (3 attempts, 1-hour intervals)
 
+### Client Connection Configuration
+
+**Important**: The client.py currently connects to "cml-test.lan:7233" while worker.py connects to "temporal:7233". When running locally or in different environments, you may need to adjust the connection string in client.py:15 to match your Temporal server address.
+
 ## Development Commands
 
 ### Formatting
@@ -74,6 +78,26 @@ docker-compose up --scale worker=3
 
 # View Temporal UI
 # http://localhost:8000
+
+# View logs for specific services
+docker-compose logs -f worker
+docker-compose logs -f temporal
+```
+
+### Debugging and Monitoring
+
+```bash
+# Monitor active workflows via Temporal UI
+# http://localhost:8000
+
+# Check workflow status for a specific rack
+# Navigate to Workflows > testflinger-agents-{rack_name}
+
+# View real-time logs
+docker-compose logs -f worker | grep -E "(ERROR|WARNING|Activity|Workflow)"
+
+# Check if Temporal server is healthy
+docker-compose ps
 ```
 
 ## Environment Variables
@@ -81,6 +105,21 @@ docker-compose up --scale worker=3
 Required for MAAS API access:
 - `MAAS_URL`: MAAS server URL
 - `MAAS_API_KEY`: OAuth credentials in format "consumer_key:token_key:token_secret"
+
+## Testing
+
+This project currently does not have a test suite. If you need to add tests:
+
+```bash
+# Add testing dependencies
+uv add pytest pytest-asyncio
+
+# Create tests directory and write tests
+mkdir tests
+# Write tests for activities and workflow logic
+```
+
+**Note**: Testing Temporal workflows requires special consideration. Use Temporal's test framework for workflow testing, and mock external API calls in activity tests.
 
 ## Our relationship
 

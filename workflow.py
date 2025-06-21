@@ -201,16 +201,35 @@ class AgentJobWorkflow:
 
         results = {}
         # Get machines and agents via activities
-        machines_with_tag = await workflow.execute_activity(
-            get_machines_activity,
-            args=[rack],
-            schedule_to_close_timeout=timedelta(seconds=90),
-        )
-        tor3_agents = await workflow.execute_activity(
-            get_tor3_agents_activity,
-            args=[],
-            schedule_to_close_timeout=timedelta(seconds=90),
-        )
+        try:
+            machines_with_tag = await workflow.execute_activity(
+                get_machines_activity,
+                args=[rack],
+                schedule_to_close_timeout=timedelta(seconds=90),
+                retry_policy=RetryPolicy(
+                    maximum_attempts=3,
+                    initial_interval=timedelta(minutes=10),
+                    backoff_coefficient=1.0,
+                ),
+            )
+        except Exception as e:
+            workflow.logger.error(f"[Workflow] Failed to get machines after retries: {e}")
+            machines_with_tag = []
+
+        try:
+            tor3_agents = await workflow.execute_activity(
+                get_tor3_agents_activity,
+                args=[],
+                schedule_to_close_timeout=timedelta(seconds=90),
+                retry_policy=RetryPolicy(
+                    maximum_attempts=3,
+                    initial_interval=timedelta(minutes=10),
+                    backoff_coefficient=1.0,
+                ),
+            )
+        except Exception as e:
+            workflow.logger.error(f"[Workflow] Failed to get TOR3 agents after retries: {e}")
+            tor3_agents = []
         agents_in_rack = [agent for agent in tor3_agents if agent in machines_with_tag]
         tested_agents = []
         for agent in agents_in_rack:
