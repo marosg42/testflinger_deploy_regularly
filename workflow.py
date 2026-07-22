@@ -82,14 +82,14 @@ def testflinger_request(method, url, **kwargs):
     headers = dict(kwargs.pop("headers", {}) or {})
     token = get_testflinger_token()
     if token:
-        headers["Authorization"] = token
+        headers["Authorization"] = f"Bearer {token}"
     response = requests.request(method, url, headers=headers, **kwargs)
 
     if response.status_code in (401, 403) and token is not None:
         logger.info("Testflinger token rejected (%s); refreshing", response.status_code)
         token = get_testflinger_token(force_refresh=True)
         if token:
-            headers["Authorization"] = token
+            headers["Authorization"] = f"Bearer {token}"
         response = requests.request(method, url, headers=headers, **kwargs)
 
     return response
