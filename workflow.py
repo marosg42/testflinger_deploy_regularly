@@ -8,6 +8,13 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger("testflinger_deploy")
 
+TESTFLINGER_SERVER = "https://testflinger.canonical.com/"
+
+# Cached Testflinger access token. Tokens are short-lived (a few minutes),
+# so it is refreshed on demand and whenever an authenticated request is
+# rejected with 401/403.
+_testflinger_token = None
+
 
 # Deterministic helpers (no requests/os/requests_oauthlib)
 def get_auth(api_key):
@@ -18,6 +25,74 @@ def get_auth(api_key):
     keys = api_key.split(":")
     auth = OAuth1(keys[0], "", keys[1], keys[2])
     return auth
+
+
+def get_testflinger_token(force_refresh=False):
+    """Obtain a Testflinger access token using client credentials.
+
+    Uses TESTFLINGER_CLIENT_ID and TESTFLINGER_SECRET_KEY from the
+    environment, exchanging them for a JWT access token via the
+    /v1/oauth2/token endpoint (HTTP Basic auth), mirroring testflinger-cli.
+
+    The token is cached module-wide and reused until ``force_refresh`` is
+    set, which is done when a request is rejected because the token expired.
+    """
+    global _testflinger_token
+    import os
+    import requests
+    from base64 import b64encode
+    from urllib.parse import urljoin
+
+    if _testflinger_token is not None and not force_refresh:
+        return _testflinger_token
+
+    load_dotenv()
+    client_id = os.environ.get("TESTFLINGER_CLIENT_ID")
+    secret_key = os.environ.get("TESTFLINGER_SECRET_KEY")
+    if not client_id or not secret_key:
+        logger.warning(
+            "TESTFLINGER_CLIENT_ID/TESTFLINGER_SECRET_KEY not set; "
+            "requests to the Testflinger API will be unauthenticated."
+        )
+        _testflinger_token = None
+        return None
+
+    encoded = b64encode(f"{client_id}:{secret_key}".encode("utf-8")).decode("ascii")
+    url = urljoin(TESTFLINGER_SERVER, "v1/oauth2/token")
+    response = requests.post(
+        url,
+        data=b"",
+        headers={"Authorization": f"Basic {encoded}"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    _testflinger_token = response.json()["access_token"]
+    return _testflinger_token
+
+
+def testflinger_request(method, url, **kwargs):
+    """Perform an authenticated Testflinger API request.
+
+    Adds the cached access token as the Authorization header. If the request
+    is rejected with 401/403 (typically an expired token), a fresh token is
+    requested once and the call is retried.
+    """
+    import requests
+
+    headers = dict(kwargs.pop("headers", {}) or {})
+    token = get_testflinger_token()
+    if token:
+        headers["Authorization"] = token
+    response = requests.request(method, url, headers=headers, **kwargs)
+
+    if response.status_code in (401, 403) and token is not None:
+        logger.info("Testflinger token rejected (%s); refreshing", response.status_code)
+        token = get_testflinger_token(force_refresh=True)
+        if token:
+            headers["Authorization"] = token
+        response = requests.request(method, url, headers=headers, **kwargs)
+
+    return response
 
 
 @activity.defn
@@ -70,9 +145,8 @@ async def get_tor3_agents_activity():
     from urllib.parse import urljoin
 
     try:
-        base_url = "https://testflinger.canonical.com/"
-        url = urljoin(base_url, "v1/agents/data")
-        response = requests.get(url, timeout=30)
+        url = urljoin(TESTFLINGER_SERVER, "v1/agents/data")
+        response = testflinger_request("GET", url, timeout=30)
         response.raise_for_status()
         agents = response.json()
         filtered = [
@@ -101,9 +175,8 @@ async def get_agent_data_activity(agent_name):
     from urllib.parse import urljoin
 
     try:
-        base_url = "https://testflinger.canonical.com/"
-        url = urljoin(base_url, "v1/agents/data")
-        response = requests.get(url, timeout=30)
+        url = urljoin(TESTFLINGER_SERVER, "v1/agents/data")
+        response = testflinger_request("GET", url, timeout=30)
         response.raise_for_status()
         agents = response.json()
 
@@ -138,18 +211,18 @@ async def get_agent_data_activity(agent_name):
 
 @activity.defn
 async def submit_job_activity(agent_name: str) -> Optional[str]:
-    import requests
     from urllib.parse import urljoin
 
-    base_url = "https://testflinger.canonical.com/"
-    url = urljoin(base_url, "v1/job")
+    url = urljoin(TESTFLINGER_SERVER, "v1/job")
     headers = {"Content-Type": "application/json"}
     payload = {
         "job_queue": agent_name,
          "provision_data": {"distro": "noble", "ephemeral": True},
          "reserve_data": {"timeout": 60},
     }
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
+    response = testflinger_request(
+        "POST", url, headers=headers, json=payload, timeout=30
+    )
     if response.status_code == 200:
         job_id = response.json().get("job_id")
         logger.info(
@@ -167,12 +240,10 @@ async def submit_job_activity(agent_name: str) -> Optional[str]:
 
 @activity.defn
 async def monitor_job_activity(job_id: str, agent_name: str) -> str:
-    import requests
     from urllib.parse import urljoin
 
-    base_url = "https://testflinger.canonical.com/"
-    url = urljoin(base_url, f"v1/result/{job_id}")
-    response = requests.get(url, timeout=30)
+    url = urljoin(TESTFLINGER_SERVER, f"v1/result/{job_id}")
+    response = testflinger_request("GET", url, timeout=30)
     if response.status_code == 200:
         data = response.json()
         state = data.get("job_state")
