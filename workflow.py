@@ -146,8 +146,8 @@ async def submit_job_activity(agent_name: str) -> Optional[str]:
     headers = {"Content-Type": "application/json"}
     payload = {
         "job_queue": agent_name,
-        "provision_data": {"distro": "noble"},
-        "reserve_data": {"timeout": 120},
+         "provision_data": {"distro": "noble", "ephemeral": True},
+         "reserve_data": {"timeout": 60},
     }
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     if response.status_code == 200:
